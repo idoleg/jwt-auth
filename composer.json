@@ -1,0 +1,30 @@
+{
+  "name": "idoleg/jwt-auth",
+  "description": "JWT Auth Guard for Laravel",
+  "homepage": "https://github.com/iooleg/jwt-auth",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Oleg Shikov",
+      "email": "ol.shikov@yandex.ru"
+    }
+  ],
+  "require": {
+    "php" : ">=5.5.0",
+    "laravel/laravel": "^5.5",
+    "lcobucci/jwt": "^3.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Idoleg\\JwtAuth\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Idoleg\\JwtAuth\\Test\\": "tests"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}
