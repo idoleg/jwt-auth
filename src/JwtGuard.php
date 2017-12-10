@@ -73,12 +73,13 @@ class JwtGuard implements Guard
      */
     public function __construct(Jwt $jwt,  Request $request, UserProvider $provider, $config)
     {
+        $this->defaultConfig['authToken']['verifyKey'] = env('JWT_AUTH_KEY');
+        $this->defaultConfig['refreshToken']['verifyKey'] = env('JWT_REFRESH_KEY');
+
         $this->jwt = $jwt;
         $this->provider = $provider;
         $this->request = $request;
         $this->config = ($config['jwt'] ?? []) + $this->defaultConfig;
-
-//        $this->setProvider($this->auth->createUserProvider($config['provider']));
     }
 
     /**

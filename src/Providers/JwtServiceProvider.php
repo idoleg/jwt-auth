@@ -31,7 +31,7 @@ class JwtServiceProvider extends ServiceProvider
 
         Auth::extend('jwt', function ($app, $name, array $config) {
 
-            return $app->make(JwtGuard::class, ['config' => $config]);
+            return $app->make(JwtGuard::class, ['provider' => Auth::createUserProvider($config['provider']), 'config' => $config]);
 
         });
     }
