@@ -1,12 +1,13 @@
 {
   "name": "idoleg/jwt-auth",
   "description": "JWT Auth Guard for Laravel",
-  "homepage": "https://github.com/iooleg/jwt-auth",
+  "homepage": "https://github.com/idoleg/jwt-auth",
   "license": "MIT",
   "authors": [
     {
       "name": "Oleg Shikov",
-      "email": "ol.shikov@yandex.ru"
+      "email": "ol.shikov@yandex.ru",
+      "role": "Developer"
     }
   ],
   "require": {
