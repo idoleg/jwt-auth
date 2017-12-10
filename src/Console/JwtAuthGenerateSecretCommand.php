@@ -112,7 +112,7 @@ class JWTAuthKeyGenerateSecretCommand extends Command
      */
     protected function isConfirmed()
     {
-        return $this->option('force') ? true : $this->confirm(
+        return $this->confirm(
             'Это приведет к утрате всех выданных токенов. Продолжить?'
         );
     }
