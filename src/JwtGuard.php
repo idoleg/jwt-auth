@@ -55,7 +55,7 @@ class JwtGuard implements Guard
     protected $defaultConfig = [
         'authToken' => [
             'verifyKey' => 'secret',
-            'life' => 43200, // 12 часов: 60 секунд * 60 минут * 12 часов
+            'life' => 43200, // 12 часов: 60 секунд * 60 минут * 12 часовx
         ],
         'refreshToken' => [
             'verifyKey' => 'secret',
@@ -71,7 +71,7 @@ class JwtGuard implements Guard
      * @param Request $request
      * @param $config
      */
-    public function __construct(Jwt $jwt,  Request $request, UserProvider $provider, $config)
+    public function __construct(Jwt $jwt, Request $request, UserProvider $provider, $config)
     {
         $this->defaultConfig['authToken']['verifyKey'] = env('JWT_AUTH_KEY');
         $this->defaultConfig['refreshToken']['verifyKey'] = env('JWT_REFRESH_KEY');
@@ -79,7 +79,7 @@ class JwtGuard implements Guard
         $this->jwt = $jwt;
         $this->provider = $provider;
         $this->request = $request;
-        $this->config = ($config['jwt'] ?? []) + $this->defaultConfig;
+        $this->config = ($config['config'] ?? []) + $this->defaultConfig;
     }
 
     /**
@@ -123,13 +123,13 @@ class JwtGuard implements Guard
      */
     public function loginByToken($token)
     {
-        try{
+        try {
             $token = $this->parseAuthToken($token);
-        }catch (JwtParseException $e){
+        } catch (JwtParseException $e) {
             return false;
-        }catch (\InvalidArgumentException $e){
+        } catch (\InvalidArgumentException $e) {
             return false;
-        }catch (\BadMethodCallException $e){
+        } catch (\BadMethodCallException $e) {
             return false;
         }
 
@@ -151,17 +151,17 @@ class JwtGuard implements Guard
      */
     public function loginByRefreshToken($token)
     {
-        try{
+        try {
             $token = $this->parseRefreshToken($token);
-        }catch (JwtParseException $e){
+        } catch (JwtParseException $e) {
             return false;
-        }catch (\InvalidArgumentException $e){
+        } catch (\InvalidArgumentException $e) {
             return false;
-        }catch (\BadMethodCallException $e){
+        } catch (\BadMethodCallException $e) {
             return false;
         }
 
-        $user = $this->provider->retrieveByToken($token->getClaim('uid'), $token->getClaim('token'));
+        $user = $this->provider->retrieveByToken($token->getClaim('uid'), $token->getClaim('token'), $token->getClaim('uip'));
 
         if (!is_null($user)) {
             return $this->login($user);
@@ -181,9 +181,21 @@ class JwtGuard implements Guard
     {
         $request = $request ?? $this->request;
 
-        $token = $this->parseTokenFromRequest($request);
+        try {
+            $token = $this->parseTokenFromRequest($request);
+        } catch (JwtParseException $e) {
+            return false;
+        } catch (\InvalidArgumentException $e) {
+            return false;
+        } catch (\BadMethodCallException $e) {
+            return false;
+        }
 
-        return $this->loginByToken($token);
+        $user = $this->provider->retrieveById($token->getClaim('uid'));
+
+        if (!is_null($user)) {
+            return $this->login($user);
+        }
     }
 
     /**
@@ -192,7 +204,7 @@ class JwtGuard implements Guard
      * @param Request $request
      * @return bool
      */
-    public function includeTokenInRequest(Request $request = NULL)
+    public function isIncludedTokenInRequest(Request $request = NULL)
     {
         $request = $request ?? $this->request;
 
@@ -206,7 +218,7 @@ class JwtGuard implements Guard
      */
     public function requireTokenInRequest(Request $request = NULL)
     {
-        if(!$this->includeTokenInRequest($request)){
+        if (!$this->isIncludedTokenInRequest($request)) {
             throw new BadRequestHttpException('Token could not be parsed from the request.', NULL, 401);
         }
     }
@@ -259,15 +271,16 @@ class JwtGuard implements Guard
         $token = $this->jwt->builder()
             ->setExpiration(time() + $this->config['authToken']['life'])
             ->set('uid', $user->id)
+            ->set('uip', $this->request->ip())
             ->set('type', 'authToken')
             ->sign($signer, $this->config['authToken']['verifyKey'])
             ->getToken();
 
-        if($returnObject){
+        if ($returnObject) {
             return $token;
         }
 
-        return (string) $token;
+        return (string)$token;
 
     }
 
@@ -289,6 +302,7 @@ class JwtGuard implements Guard
             $token->validate($this->jwt->validator())
             and $token->verify($signer, $this->config['authToken']['verifyKey'])
             and $token->hasClaim('uid')
+            and $token->hasClaim('uip')
             and $token->hasClaim('type')
             and $token->getClaim('type') == 'authToken'
         ) {
@@ -311,24 +325,25 @@ class JwtGuard implements Guard
         $user = $user ?? $this->user;
         if (is_null($user)) throw new \InvalidArgumentException('User не указан');;
 
-        $this->provider->updateRememberToken($user, Str::random(64));
+        $rememberToken = Str::random(64);
+        $this->provider->updateRememberToken($user, $rememberToken, $this->request->ip());
 
         $signer = new Sha256();
 
         $token = $this->jwt->builder()
             ->setExpiration(time() + $this->config['refreshToken']['life'])
-            ->set('token', $user->getRememberToken())
+            ->set('token',$rememberToken)
             ->set('uid', $user->id)
             ->set('uip', $this->request->ip())
             ->set('type', 'refreshToken')
             ->sign($signer, $this->config['refreshToken']['verifyKey'])
             ->getToken();
 
-        if($returnObject){
+        if ($returnObject) {
             return $token;
         }
 
-        return (string) $token;
+        return (string)$token;
     }
 
     /**

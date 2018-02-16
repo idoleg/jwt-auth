@@ -39,7 +39,7 @@ class JwtGuardTest extends AbstractTestCase
     protected $request;
 
     protected $testConfig = [
-        'jwt' => [
+        'config' => [
             'authToken' => [
                 'verifyKey' => 'very_secret',
                 'life' => 43200, // 12 часов: 60 секунд * 60 минут * 12 часов

@@ -5,6 +5,7 @@ namespace Idoleg\JwtAuth\Providers;
 use Auth;
 use Idoleg\JwtAuth\Console\JWTAuthKeyGenerateSecretCommand;
 use Idoleg\JwtAuth\Contracts\Jwt;
+use Idoleg\JwtAuth\EloquentTokenUserProvider;
 use Idoleg\JwtAuth\JwtGuard;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +29,11 @@ class JwtServiceProvider extends ServiceProvider
                 JWTAuthKeyGenerateSecretCommand::class
             ]);
         }
+
+        Auth::provider('eloquent-tokens', function ($app, array $config) {
+
+            return $app->make(EloquentTokenUserProvider::class, ['userModel' => $config['models']['user'], 'tokenModel' => $config['models']['token']]);
+        });
 
         Auth::extend('jwt', function ($app, $name, array $config) {
 
