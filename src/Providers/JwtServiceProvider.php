@@ -32,7 +32,7 @@ class JwtServiceProvider extends ServiceProvider
 
         Auth::provider('eloquent-tokens', function ($app, array $config) {
 
-            return $app->make(EloquentTokenUserProvider::class, ['userModel' => $config['models']['user'], 'tokenModel' => $config['models']['token']]);
+            return $app->make(EloquentTokenUserProvider::class, ['hasher' => $app['hash'], 'userModel' => $config['models']['user'], 'tokenModel' => $config['models']['token']]);
         });
 
         Auth::extend('jwt', function ($app, $name, array $config) {
