@@ -388,10 +388,10 @@ class JwtGuard implements Guard
         $this->provider->updateRememberToken($this->provider->retrieveById($token->getClaim('uid')), $newRememberToken, $token->getClaim('token'));
 
         if ($returnObject) {
-            return $token;
+            return $newToken;
         }
 
-        return (string)$token;
+        return (string)$newToken;
     }
 
     /**

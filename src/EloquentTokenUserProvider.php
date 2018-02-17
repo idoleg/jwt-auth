@@ -149,6 +149,8 @@ class EloquentTokenUserProvider implements UserProvider
         if (!empty($agent)) $tokenModel->agent = $agent;
 
         if (!empty($logged_at)) $tokenModel->logged_at = $logged_at;
+
+        $tokenModel->save();
     }
 
     /**
