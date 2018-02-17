@@ -106,7 +106,7 @@ class EloquentTokenUserProvider implements UserProvider
      * @param null $uip
      * @param null $type
      * @param null $agent
-     * @param null $logged_at Format \DateTime::ATOM
+     * @param null $logged_at Format timestamp
      * @return void
      */
     public function createRememberToken(UserContract $user, $remember_token, $uip = null, $type = null, $agent = null, $logged_at = null)
@@ -120,7 +120,7 @@ class EloquentTokenUserProvider implements UserProvider
         if (!empty($type)) $tokenModel->type = $type;
         if (!empty($agent)) $tokenModel->agent = $agent;
 
-        $tokenModel->logged_at = $logged_at ?? date(\DateTime::ATOM);
+        $tokenModel->logged_at = $logged_at ?? time();
 
         $tokenModel->save();
     }
@@ -134,7 +134,7 @@ class EloquentTokenUserProvider implements UserProvider
      * @param null $uip
      * @param null $type
      * @param null $agent
-     * @param null $logged_at Format \DateTime::ATOM
+     * @param null $logged_at Format timestamp
      * @return void
      * @throws \Exception
      */
