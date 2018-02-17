@@ -136,11 +136,16 @@ class EloquentTokenUserProvider implements UserProvider
      * @param null $agent
      * @param null $logged_at Format \DateTime::ATOM
      * @return void
+     * @throws \Exception
      */
     public function updateRememberToken(UserContract $user, $newRememberToken = null, $oldRememberToken = null, $uip = null, $type = null, $agent = null, $logged_at = null)
     {
         $tokenModel = $this->createTokenModel();
         $tokenModel = $tokenModel->where('user_id', $user->getAuthIdentifier())->where('remember_token', $oldRememberToken)->first();
+
+        if (empty($tokenModel)) {
+            throw new \Exception('такой не возможно обновить - он не существует');
+        }
 
         if (!empty($newRememberToken)) $tokenModel->remember_token = $newRememberToken;
 
