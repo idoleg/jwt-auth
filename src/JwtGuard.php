@@ -48,6 +48,13 @@ class JwtGuard implements Guard
     protected $config;
 
     /**
+     * Guest
+     *
+     * @var array
+     */
+    protected $guest;
+
+    /**
      * Default auth configuration
      *
      * @var array
@@ -61,6 +68,7 @@ class JwtGuard implements Guard
             'verifyKey' => 'secret',
             'life' => 2592000, // 1 месяц: 60 секунд * 60 минут * 24 часа * 30 дней
         ],
+        'guest' => false,
     ];
 
     /**
@@ -161,7 +169,7 @@ class JwtGuard implements Guard
             return false;
         }
 
-        $user = $this->provider->retrieveByToken($token->getClaim('uid'), $token->getClaim('token'), $token->getClaim('uip'));
+        $user = $this->provider->retrieveByToken($token->getClaim('uid'), $token->getClaim('token'), $this->request->ip());
 
         if (!is_null($user)) {
             return $this->login($user);
@@ -305,6 +313,7 @@ class JwtGuard implements Guard
             and $token->hasClaim('uip')
             and $token->hasClaim('type')
             and $token->getClaim('type') == 'authToken'
+            and $token->getClaim('uip') == $this->request->ip()
         ) {
             return $token;
         }
@@ -326,14 +335,51 @@ class JwtGuard implements Guard
         if (is_null($user)) throw new \InvalidArgumentException('User не указан');;
 
         $rememberToken = Str::random(64);
-        $this->provider->updateRememberToken($user, $rememberToken, $this->request->ip());
+        if($this->provider instanceof EloquentTokenUserProvider){
+            $this->provider->createRememberToken($user, $rememberToken, $this->request->ip());
+        }else{
+            $this->provider->updateRememberToken($user, $rememberToken);
+        }
+
 
         $signer = new Sha256();
 
         $token = $this->jwt->builder()
             ->setExpiration(time() + $this->config['refreshToken']['life'])
-            ->set('token',$rememberToken)
+            ->set('token', $rememberToken)
             ->set('uid', $user->id)
+            ->set('uip', $this->request->ip())
+            ->set('type', 'refreshToken')
+            ->sign($signer, $this->config['refreshToken']['verifyKey'])
+            ->getToken();
+
+        if ($returnObject) {
+            return $token;
+        }
+
+        return (string)$token;
+    }
+
+    /**
+     * Обновить токен обновления
+     *
+     * @param $token
+     * @param bool $returnObject
+     * @return mixed
+     * @throws JwtParseException
+     */
+    public function updateRefreshToken($token, $returnObject = false)
+    {
+        $token = $this->parseRefreshToken($token);
+
+        $rememberToken = Str::random(64);
+        $this->provider->updateRememberToken($this->provider->retrieveById($token->getClaim('uid')), $rememberToken);
+
+        $signer = new Sha256();
+        $newToken = $this->jwt->builder()
+            ->setExpiration($token->getClaim('exp'))
+            ->set('token', $rememberToken)
+            ->set('uid', $token->getClaim('uid'))
             ->set('uip', $this->request->ip())
             ->set('type', 'refreshToken')
             ->sign($signer, $this->config['refreshToken']['verifyKey'])
@@ -377,12 +423,69 @@ class JwtGuard implements Guard
     }
 
     /**
+     * Получить id гостя, если гость это конкретный объект User, либо false, если гость - это отсутсвие объекта User
+     *
+     * @return int|false
+     */
+    public function getGuestId()
+    {
+        if (is_array($this->config['guest'])) {
+            return $this->config['guest']['id'];
+        }
+        return false;
+    }
+
+    /**
+     * Determine if the current user is a guest.
+     *
+     * @param Authenticatable|NULL $user
+     * @return bool
+     */
+    public function guest(Authenticatable $user = NULL)
+    {
+        $user = $user ?? $this->user();
+
+        if (!empty($user)) {
+            if($user->getAuthIdentifier() === $this->getGuestId()){
+                return true;
+            }else{
+                return false;
+            }
+
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine if the current user is authenticated.
+     *
+     * @return bool
+     */
+    public function check()
+    {
+        return !$this->guest();
+    }
+
+    /**
      * Get the currently authenticated user.
      *
      * @return \Illuminate\Contracts\Auth\Authenticatable|null
      */
     public function user()
     {
+        if (empty($this->user)) {
+
+            if ($this->getGuestId()) {
+                if (empty($this->guest)) {
+                    $class = $this->config['guest']['model'];
+                    $this->guest = $class::find($this->getGuestId());
+                }
+
+                return $this->guest;
+            }
+
+        }
         return $this->user;
     }
 
