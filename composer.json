@@ -1,6 +1,7 @@
 {
   "name": "idoleg/jwt-auth",
   "description": "JWT Auth Guard for Laravel",
+  "version": "1.0.0-alpha",
   "homepage": "https://github.com/idoleg/jwt-auth",
   "license": "MIT",
   "authors": [
