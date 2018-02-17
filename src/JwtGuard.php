@@ -335,9 +335,9 @@ class JwtGuard implements Guard
         if (is_null($user)) throw new \InvalidArgumentException('User не указан');;
 
         $rememberToken = Str::random(64);
-        if($this->provider instanceof EloquentTokenUserProvider){
+        if ($this->provider instanceof EloquentTokenUserProvider) {
             $this->provider->createRememberToken($user, $rememberToken, $this->request->ip());
-        }else{
+        } else {
             $this->provider->updateRememberToken($user, $rememberToken);
         }
 
@@ -372,18 +372,20 @@ class JwtGuard implements Guard
     {
         $token = $this->parseRefreshToken($token);
 
-        $rememberToken = Str::random(64);
-        $this->provider->updateRememberToken($this->provider->retrieveById($token->getClaim('uid')), $rememberToken);
+        $newRememberToken = Str::random(64);
+
 
         $signer = new Sha256();
         $newToken = $this->jwt->builder()
             ->setExpiration($token->getClaim('exp'))
-            ->set('token', $rememberToken)
+            ->set('token', $newRememberToken)
             ->set('uid', $token->getClaim('uid'))
             ->set('uip', $this->request->ip())
             ->set('type', 'refreshToken')
             ->sign($signer, $this->config['refreshToken']['verifyKey'])
             ->getToken();
+
+        $this->provider->updateRememberToken($this->provider->retrieveById($token->getClaim('uid')), $newRememberToken, $token->getClaim('token'));
 
         if ($returnObject) {
             return $token;
@@ -446,9 +448,9 @@ class JwtGuard implements Guard
         $user = $user ?? $this->user();
 
         if (!empty($user)) {
-            if($user->getAuthIdentifier() === $this->getGuestId()){
+            if ($user->getAuthIdentifier() === $this->getGuestId()) {
                 return true;
-            }else{
+            } else {
                 return false;
             }
 

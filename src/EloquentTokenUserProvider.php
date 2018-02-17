@@ -120,7 +120,7 @@ class EloquentTokenUserProvider implements UserProvider
         if (!empty($type)) $tokenModel->type = $type;
         if (!empty($agent)) $tokenModel->agent = $agent;
 
-        $tokenModel->logged_at = $logged_at ?? \DateTime::ATOM;
+        $tokenModel->logged_at = $logged_at ?? date(\DateTime::ATOM);
 
         $tokenModel->save();
     }
@@ -129,19 +129,20 @@ class EloquentTokenUserProvider implements UserProvider
      * Update the "remember me" token for the given user in storage.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable $user
-     * @param  string $remember_token
+     * @param  string $newRememberToken
+     * @param null $oldRememberToken
      * @param null $uip
      * @param null $type
      * @param null $agent
      * @param null $logged_at Format \DateTime::ATOM
      * @return void
      */
-    public function updateRememberToken(UserContract $user, $remember_token = null, $uip = null, $type = null, $agent = null, $logged_at = null)
+    public function updateRememberToken(UserContract $user, $newRememberToken = null, $oldRememberToken = null, $uip = null, $type = null, $agent = null, $logged_at = null)
     {
         $tokenModel = $this->createTokenModel();
-        $tokenModel = $tokenModel->where('user_id',  $user->getAuthIdentifier())->where('remember_token', $remember_token)->first();
+        $tokenModel = $tokenModel->where('user_id', $user->getAuthIdentifier())->where('remember_token', $oldRememberToken)->first();
 
-        if (!empty($remember_token)) $tokenModel->remember_token = $remember_token;
+        if (!empty($newRememberToken)) $tokenModel->remember_token = $newRememberToken;
 
         if (!empty($uip)) $tokenModel->user_ip = $uip;
         if (!empty($type)) $tokenModel->type = $type;
