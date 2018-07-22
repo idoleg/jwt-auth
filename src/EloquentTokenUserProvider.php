@@ -76,11 +76,11 @@ class EloquentTokenUserProvider implements UserProvider
      * @param  string $uip User IP address
      * @return \Illuminate\Contracts\Auth\Authenticatable|null
      */
-    public function retrieveByToken($identifier, $remember_token, $uip = null)
+    public function retrieveByToken($identifier, $uToken, $uip = null)
     {
         $tokenModel = $this->createTokenModel();
 
-        $tokenModel = $tokenModel->where('user_id', $identifier)->where('remember_token', $remember_token)->first();;
+        $tokenModel = $tokenModel->where('user_id', $identifier)->where('unique_token', $uToken)->first();;
 
         if (!$tokenModel) {
             return null;
@@ -109,28 +109,27 @@ class EloquentTokenUserProvider implements UserProvider
      * @param null $logged_at Format timestamp
      * @return void
      */
-    public function createRememberToken(UserContract $user, $remember_token, $uip = null, $type = null, $agent = null, $logged_at = null)
-    {
-        $tokenModel = $this->createTokenModel();
+    // public function createRememberToken(UserContract $user, $remember_token, $uip = null, $type = null, $agent = null, $logged_at = null)
+    // {
+    //     $tokenModel = $this->createTokenModel();
 
-        $tokenModel->user_id = $user->getAuthIdentifier();
-        $tokenModel->remember_token = $remember_token;
+    //     $tokenModel->user_id = $user->getAuthIdentifier();
+    //     $tokenModel->remember_token = $remember_token;
 
-        if (!empty($uip)) $tokenModel->user_ip = $uip;
-        if (!empty($type)) $tokenModel->type = $type;
-        if (!empty($agent)) $tokenModel->agent = $agent;
+    //     if (!empty($uip)) $tokenModel->user_ip = $uip;
+    //     if (!empty($type)) $tokenModel->type = $type;
+    //     if (!empty($agent)) $tokenModel->agent = $agent;
 
-        $tokenModel->logged_at = $logged_at ?? time();
+    //     $tokenModel->logged_at = $logged_at ?? time();
 
-        $tokenModel->save();
-    }
+    //     $tokenModel->save();
+    // }
 
     /**
      * Update the "remember me" token for the given user in storage.
      *
      * @param  \Illuminate\Contracts\Auth\Authenticatable $user
-     * @param  string $newRememberToken
-     * @param null $oldRememberToken
+     * @param  string $uToken
      * @param null $uip
      * @param null $type
      * @param null $agent
@@ -138,22 +137,18 @@ class EloquentTokenUserProvider implements UserProvider
      * @return void
      * @throws \Exception
      */
-    public function updateRememberToken(UserContract $user, $newRememberToken = null, $oldRememberToken = null, $uip = null, $type = null, $agent = null, $logged_at = null)
+    public function updateRememberToken(UserContract $user, $uToken = null, $uip = null, $type = null, $agent = null, $logged_at = null)
     {
         $tokenModel = $this->createTokenModel();
-        $tokenModel = $tokenModel->where('user_id', $user->getAuthIdentifier())->where('remember_token', $oldRememberToken)->first();
 
-        if (empty($tokenModel)) {
-            throw new \Exception('такой не возможно обновить - он не существует');
-        }
-
-        if (!empty($newRememberToken)) $tokenModel->remember_token = $newRememberToken;
+        $tokenModel->user_id = $user->getAuthIdentifier();
+        $tokenModel->unique_token = $uToken;
 
         if (!empty($uip)) $tokenModel->user_ip = $uip;
         if (!empty($type)) $tokenModel->type = $type;
         if (!empty($agent)) $tokenModel->agent = $agent;
 
-        if (!empty($logged_at)) $tokenModel->logged_at = $logged_at;
+        $tokenModel->logged_at = $logged_at ?? time();
 
         $tokenModel->save();
     }

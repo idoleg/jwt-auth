@@ -2,8 +2,8 @@
 
 namespace Idoleg\JwtAuth;
 
-use Idoleg\JwtAuth\Exceptions\JwtParseException;
 use Idoleg\JwtAuth\Contracts\Jwt;
+use Idoleg\JwtAuth\Exceptions\JwtParseException;
 use Illuminate\Auth\GuardHelpers;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Factory as Auth;
@@ -13,7 +13,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-
 
 class JwtGuard implements Guard
 {
@@ -64,10 +63,6 @@ class JwtGuard implements Guard
             'verifyKey' => 'secret',
             'life' => 43200, // 12 часов: 60 секунд * 60 минут * 12 часовx
         ],
-        'refreshToken' => [
-            'verifyKey' => 'secret',
-            'life' => 2592000, // 1 месяц: 60 секунд * 60 минут * 24 часа * 30 дней
-        ],
         'guest' => false,
     ];
 
@@ -82,7 +77,6 @@ class JwtGuard implements Guard
     public function __construct(Jwt $jwt, Request $request, UserProvider $provider, $config)
     {
         $this->defaultConfig['authToken']['verifyKey'] = env('JWT_AUTH_KEY');
-        $this->defaultConfig['refreshToken']['verifyKey'] = env('JWT_REFRESH_KEY');
 
         $this->jwt = $jwt;
         $this->provider = $provider;
@@ -141,34 +135,6 @@ class JwtGuard implements Guard
             return false;
         }
 
-        $user = $this->provider->retrieveById($token->getClaim('uid'));
-
-        if (!is_null($user)) {
-            return $this->login($user);
-        }
-
-        return false;
-
-    }
-
-    /**
-     * Аутентифицировать пользователя в системе с помощью jwt токена обновления (refreshToken)
-     *
-     * @param $token
-     * @return bool
-     */
-    public function loginByRefreshToken($token)
-    {
-        try {
-            $token = $this->parseRefreshToken($token);
-        } catch (JwtParseException $e) {
-            return false;
-        } catch (\InvalidArgumentException $e) {
-            return false;
-        } catch (\BadMethodCallException $e) {
-            return false;
-        }
-
         $user = $this->provider->retrieveByToken($token->getClaim('uid'), $token->getClaim('token'), $this->request->ip());
 
         if (!is_null($user)) {
@@ -176,6 +142,7 @@ class JwtGuard implements Guard
         }
 
         return false;
+
     }
 
     /**
@@ -185,7 +152,7 @@ class JwtGuard implements Guard
      * @return bool
      * @throws JwtParseException
      */
-    public function loginByRequest(Request $request = NULL)
+    public function loginByRequest(Request $request = null)
     {
         $request = $request ?? $this->request;
 
@@ -196,6 +163,10 @@ class JwtGuard implements Guard
         } catch (\InvalidArgumentException $e) {
             return false;
         } catch (\BadMethodCallException $e) {
+            return false;
+        }
+
+        if (!$token) {
             return false;
         }
 
@@ -212,7 +183,7 @@ class JwtGuard implements Guard
      * @param Request $request
      * @return bool
      */
-    public function isIncludedTokenInRequest(Request $request = NULL)
+    public function isIncludedTokenInRequest(Request $request = null)
     {
         $request = $request ?? $this->request;
 
@@ -224,10 +195,10 @@ class JwtGuard implements Guard
      *
      * @param Request $request
      */
-    public function requireTokenInRequest(Request $request = NULL)
+    public function requireTokenInRequest(Request $request = null)
     {
         if (!$this->isIncludedTokenInRequest($request)) {
-            throw new BadRequestHttpException('Token could not be parsed from the request.', NULL, 401);
+            throw new BadRequestHttpException('Token could not be parsed from the request.', null, 401);
         }
     }
 
@@ -238,7 +209,7 @@ class JwtGuard implements Guard
      * @return bool
      * @throws JwtParseException
      */
-    public function parseTokenFromRequest(Request $request = NULL)
+    public function parseTokenFromRequest(Request $request = null)
     {
         $request = $request ?? $this->request;
 
@@ -255,7 +226,7 @@ class JwtGuard implements Guard
      * @param Request|NULL $request
      * @return null|string
      */
-    public function getTokenFromRequest(Request $request = NULL)
+    public function getTokenFromRequest(Request $request = null)
     {
         $request = $request ?? $this->request;
 
@@ -269,18 +240,28 @@ class JwtGuard implements Guard
      * @param bool $returnObject
      * @return mixed
      */
-    public function createAuthToken(Authenticatable $user = NULL, $returnObject = false)
+    public function createAuthToken($data = [], Authenticatable $user = null, $returnObject = false)
     {
         $user = $user ?? $this->user;
-        if (is_null($user)) throw new \InvalidArgumentException('User не указан');
+        if (is_null($user)) {
+            throw new \InvalidArgumentException('Argument "User" is required');
+        }
 
         $signer = new Sha256();
+
+        $uToken = Str::random(100);
+        if ($this->provider instanceof EloquentTokenUserProvider) {
+            $this->provider->updateRememberToken($user, $uToken, $this->request->ip(), $data['type'] ?? null, $data['ahent'] ?? null);
+        } else {
+            $this->provider->updateRememberToken($user, $uToken);
+        }
 
         $token = $this->jwt->builder()
             ->setExpiration(time() + $this->config['authToken']['life'])
             ->set('uid', $user->id)
             ->set('uip', $this->request->ip())
             ->set('type', 'authToken')
+            ->set('token', $uToken)
             ->sign($signer, $this->config['authToken']['verifyKey'])
             ->getToken();
 
@@ -288,7 +269,7 @@ class JwtGuard implements Guard
             return $token;
         }
 
-        return (string)$token;
+        return (string) $token;
 
     }
 
@@ -313,115 +294,14 @@ class JwtGuard implements Guard
             and $token->hasClaim('uip')
             and $token->hasClaim('type')
             and $token->getClaim('type') == 'authToken'
-            and $token->getClaim('uip') == $this->request->ip()
-        ) {
-            return $token;
-        }
-
-        throw new JwtParseException('Auth JWT не валидный');
-
-    }
-
-    /**
-     * Создать токен обновления
-     *
-     * @param Authenticatable|NULL $user
-     * @param bool $returnObject
-     * @return mixed
-     */
-    public function createRefreshToken(Authenticatable $user = NULL, $returnObject = false)
-    {
-        $user = $user ?? $this->user;
-        if (is_null($user)) throw new \InvalidArgumentException('User не указан');;
-
-        $rememberToken = Str::random(64);
-        if ($this->provider instanceof EloquentTokenUserProvider) {
-            $this->provider->createRememberToken($user, $rememberToken, $this->request->ip());
-        } else {
-            $this->provider->updateRememberToken($user, $rememberToken);
-        }
-
-
-        $signer = new Sha256();
-
-        $token = $this->jwt->builder()
-            ->setExpiration(time() + $this->config['refreshToken']['life'])
-            ->set('token', $rememberToken)
-            ->set('uid', $user->id)
-            ->set('uip', $this->request->ip())
-            ->set('type', 'refreshToken')
-            ->sign($signer, $this->config['refreshToken']['verifyKey'])
-            ->getToken();
-
-        if ($returnObject) {
-            return $token;
-        }
-
-        return (string)$token;
-    }
-
-    /**
-     * Обновить токен обновления
-     *
-     * @param $token
-     * @param bool $returnObject
-     * @return mixed
-     * @throws JwtParseException
-     */
-    public function updateRefreshToken($token, $returnObject = false)
-    {
-        $token = $this->parseRefreshToken($token);
-
-        $newRememberToken = Str::random(64);
-
-
-        $signer = new Sha256();
-        $newToken = $this->jwt->builder()
-            ->setExpiration($token->getClaim('exp'))
-            ->set('token', $newRememberToken)
-            ->set('uid', $token->getClaim('uid'))
-            ->set('uip', $this->request->ip())
-            ->set('type', 'refreshToken')
-            ->sign($signer, $this->config['refreshToken']['verifyKey'])
-            ->getToken();
-
-        $this->provider->updateRememberToken($this->provider->retrieveById($token->getClaim('uid')), $newRememberToken, $token->getClaim('token'));
-
-        if ($returnObject) {
-            return $newToken;
-        }
-
-        return (string)$newToken;
-    }
-
-    /**
-     * Пропарсить токен обновления
-     *
-     * @param $token
-     * @return mixed
-     * @throws JwtParseException
-     */
-    public function parseRefreshToken($token)
-    {
-        $token = $this->jwt->parser()
-            ->parse($token);
-
-        $signer = new Sha256();
-
-        if (
-            $token->validate($this->jwt->validator())
-            and $token->verify($signer, $this->config['authToken']['verifyKey'])
             and $token->hasClaim('token')
-            and $token->hasClaim('type')
-            and $token->hasClaim('uid')
-            and $token->hasClaim('uip')
-            and $token->getClaim('type') == 'refreshToken'
             and $token->getClaim('uip') == $this->request->ip()
         ) {
             return $token;
         }
 
-        throw new JwtParseException('Refresh JWT не валидный');
+        throw new JwtParseException('Auth JWT is not valid');
+
     }
 
     /**
@@ -443,7 +323,7 @@ class JwtGuard implements Guard
      * @param Authenticatable|NULL $user
      * @return bool
      */
-    public function guest(Authenticatable $user = NULL)
+    public function guest(Authenticatable $user = null)
     {
         $user = $user ?? $this->user();
 
